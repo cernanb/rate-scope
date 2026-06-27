@@ -15,12 +15,14 @@ export function GET(request: NextRequest) {
   }
 
   const store = getStore();
+  const pageParam = params.get("page");
   const result = query(store, {
     code,
     type: params.get("type") ?? undefined,
     npi: params.get("npi") ?? undefined,
     ein: params.get("ein") ?? undefined,
     facility: params.get("facility") ?? undefined,
+    page: pageParam ? Math.max(1, parseInt(pageParam, 10)) : 1,
   });
 
   return new Response(JSON.stringify(result), {

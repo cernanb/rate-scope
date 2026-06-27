@@ -1,5 +1,6 @@
 import { Rate, Store } from "./types";
 import { normalizeEIN } from "./util";
+export const PER_PAGE = 200;
 
 type QueryParams = {
   code: string;
@@ -7,6 +8,7 @@ type QueryParams = {
   npi?: string;
   ein?: string;
   facility?: string;
+  page?: number;
 };
 
 export type ResultRow = Rate & {
@@ -20,6 +22,8 @@ export type QueryResult = {
   name: string | null;
   description: string | null;
   count: number;
+  page: number;
+  totalPages: number;
   rows: ResultRow[];
 };
 
@@ -28,6 +32,7 @@ export function query(store: Store, params: QueryParams): QueryResult {
 
   let rateList: Rate[][];
   let isMultiName = false;
+  const page = params.page ?? 1;
 
   const suffix = `:${params.code}`;
 
@@ -68,12 +73,16 @@ export function query(store: Store, params: QueryParams): QueryResult {
     }
   }
 
+  const paginatedRows = rows.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
   return {
     code: params.code,
     type: params.type?.toUpperCase() ?? null,
     name: isMultiName ? null : (rows[0]?.name ?? null),
     description: isMultiName ? null : (rows[0]?.description ?? null),
     count: rows.length,
-    rows,
+    page,
+    totalPages: Math.max(1, Math.ceil(rows.length / PER_PAGE)),
+    rows: paginatedRows,
   };
 }

@@ -19,22 +19,24 @@ export default function RateSearch({ metadata }: Props) {
   const [result, setResult] = useState<QueryResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>();
+  const [lastParams, setLastParams] = useState<SearchParams | null>(null);
 
   function handleClear() {
     setResult(null);
     setError(null);
+    setLastParams(null);
   }
 
-  async function handleSearch(params: SearchParams) {
+  async function fetchPage(params: SearchParams, page: number) {
     setLoading(true);
     setError(null);
-    setResult(null);
     try {
       const searchParams = new URLSearchParams({ code: params.code });
       if (params.type) searchParams.set("type", params.type);
       if (params.npi) searchParams.set("npi", params.npi);
       if (params.ein) searchParams.set("ein", params.ein);
       if (params.facility) searchParams.set("facility", params.facility);
+      if (page > 1) searchParams.set("page", String(page));
       const res = await fetch(`/api/rates?${searchParams}`);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -46,6 +48,17 @@ export default function RateSearch({ metadata }: Props) {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleSearch(params: SearchParams) {
+    setLastParams(params);
+    setResult(null);
+    await fetchPage(params, 1);
+  }
+
+  function handlePageChange(page: number) {
+    if (!lastParams) return;
+    fetchPage(lastParams, page);
   }
 
   return (
@@ -75,7 +88,7 @@ export default function RateSearch({ metadata }: Props) {
             </p>
           )}
 
-          {result && <ResultsTable result={result} />}
+          {result && <ResultsTable result={result} onPageChange={handlePageChange} loading={loading} />}
 
           {!result && !loading && !error && (
             <p className="mt-8 text-center text-sm text-zinc-400">
