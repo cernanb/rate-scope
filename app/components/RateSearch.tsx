@@ -20,6 +20,11 @@ export default function RateSearch({ metadata }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>();
 
+  function handleClear() {
+    setResult(null);
+    setError(null);
+  }
+
   async function handleSearch(params: SearchParams) {
     setLoading(true);
     setError(null);
@@ -57,7 +62,11 @@ export default function RateSearch({ metadata }: Props) {
       </header>
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
-        <SearchForm onSearch={handleSearch} loading={loading} />
+        <SearchForm
+          onClear={handleClear}
+          onSearch={handleSearch}
+          loading={loading}
+        />
 
         <div className="mt-6">
           {error && (

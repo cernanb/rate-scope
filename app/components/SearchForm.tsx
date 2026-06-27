@@ -13,9 +13,10 @@ export type SearchParams = {
 type Props = {
   onSearch: (params: SearchParams) => void;
   loading: boolean;
+  onClear: () => void;
 };
 
-export default function SearchForm({ onSearch, loading }: Props) {
+export default function SearchForm({ onSearch, loading, onClear }: Props) {
   const [code, setCode] = useState("");
   const [type, setType] = useState("");
   const [npi, setNpi] = useState("");
@@ -129,7 +130,22 @@ export default function SearchForm({ onSearch, loading }: Props) {
         </div>
       </div>
 
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex justify-end gap-2">
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => {
+            setCode("");
+            setType("");
+            setNpi("");
+            setEin("");
+            setFacility("");
+            onClear();
+          }}
+          className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Clear
+        </button>
         <button
           type="submit"
           disabled={loading || !code.trim()}
