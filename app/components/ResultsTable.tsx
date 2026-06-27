@@ -68,9 +68,6 @@ export default function ResultsTable({ result }: Props) {
               <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500">
                 Additional Info
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500">
-                Expiration
-              </th>
             </tr>
           </thead>
           <tbody>
@@ -107,17 +104,6 @@ export default function ResultsTable({ result }: Props) {
                   title={row.additionalInformation ?? undefined}
                 >
                   {row.additionalInformation ?? (
-                    <span className="text-zinc-400">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-zinc-600">
-                  {row.expirationDate ? (
-                    new Date(row.expirationDate).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })
-                  ) : (
                     <span className="text-zinc-400">—</span>
                   )}
                 </td>
