@@ -4,7 +4,7 @@ import { mkdir } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
 import { pick } from "stream-json/filters/pick.js";
 import { streamArray } from "stream-json/streamers/stream-array.js";
-import { Provider, ProviderReference, Rate } from "@/lib/types";
+import { Provider, ProviderSubGroup, ProviderReference, Rate } from "@/lib/types";
 
 const fidelisIndexFile =
   "https://www.centene.com/content/dam/centene/Centene%20Corporate/json/DOCUMENT/2026-04-28_fidelis_index.json";
@@ -75,6 +75,8 @@ async function ingest() {
 
     const providers = new Map<string, Provider>();
     const rates = new Map<string, Rate[]>();
+    const seen = new Map<string, Set<string>>();
+    const namesByKey = new Map<string, Set<string>>();
 
     for await (const { value } of stream as AsyncIterable<{ value: any }>) {
       if (value.billing_code !== undefined) {
@@ -85,15 +87,26 @@ async function ingest() {
         const description = value.description;
         const key = `${billingCodeType}:${billingCode}`;
 
+        if (!namesByKey.has(key)) namesByKey.set(key, new Set());
+        namesByKey.get(key)!.add(name);
+
         let bucket = rates.get(key);
         if (!bucket) {
           bucket = [];
           rates.set(key, bucket);
+          seen.set(key, new Set());
         }
+        const seenKeys = seen.get(key)!;
 
         for (const negotiated of value.negotiated_rates ?? []) {
           for (const price of negotiated.negotiated_prices ?? []) {
             for (const groupId of negotiated.provider_references ?? []) {
+              const modifiers = (price.billing_code_modifier ?? []).join(",");
+              const serviceCodes = (price.service_code ?? []).join(",");
+              const rowKey = `${groupId}|${price.negotiated_rate}|${price.negotiated_type}|${price.billing_class}|${price.setting ?? ""}|${modifiers}|${serviceCodes}|${price.expiration_date ?? ""}`;
+              if (seenKeys.has(rowKey)) continue;
+              seenKeys.add(rowKey);
+
               bucket.push({
                 groupId: String(groupId),
                 billingCode,
@@ -116,24 +129,19 @@ async function ingest() {
         // provider_references item -> provider entry keyed by group id.
         const ref = value as ProviderReference;
         const groupId = String(ref.provider_group_id);
-        const npis = new Set<string>();
-        const businessNames = new Set<string>();
-        const eins = new Set<string>();
+        const subGroups: ProviderSubGroup[] = [];
 
         for (const group of ref.provider_groups ?? []) {
-          for (const n of group.npi ?? []) npis.add(String(n));
-          if (group.tin?.type === "ein") {
-            if (group.tin.value) eins.add(group.tin.value);
-            if (group.tin.business_name)
-              businessNames.add(group.tin.business_name);
-          }
+          if (group.tin?.type !== "ein") continue;
+          if (!group.tin.value || !group.tin.business_name) continue;
+          subGroups.push({
+            businessName: group.tin.business_name,
+            ein: group.tin.value,
+            npis: new Set((group.npi ?? []).map(String)),
+          });
         }
 
-        providers.set(groupId, {
-          businessNames: [...businessNames],
-          eins: [...eins],
-          npis,
-        });
+        providers.set(groupId, { subGroups });
       }
     }
 
@@ -144,9 +152,16 @@ async function ingest() {
       `Parsed ${rates.size} unique billing codes (${rowCount} rate rows).`,
     );
 
+    const multiNameCodes = new Set(
+      [...namesByKey.entries()]
+        .filter(([, names]) => names.size > 1)
+        .map(([key]) => key),
+    );
+
     const store = {
       providers,
       rates,
+      multiNameCodes,
       sourceUrl: fileToIngest.location,
       ingestDate: new Date().toISOString(),
       chosenFile: fileToIngest.location.split("/").pop() ?? "unknown",
@@ -157,10 +172,16 @@ async function ingest() {
       providers: Object.fromEntries(
         [...store.providers.entries()].map(([k, v]) => [
           k,
-          { ...v, npis: [...v.npis] },
+          {
+            subGroups: v.subGroups.map((sg) => ({
+              ...sg,
+              npis: [...sg.npis],
+            })),
+          },
         ]),
       ),
       rates: Object.fromEntries(store.rates),
+      multiNameCodes: [...store.multiNameCodes],
       sourceUrl: store.sourceUrl,
       ingestDate: store.ingestDate,
       chosenFile: store.chosenFile,
