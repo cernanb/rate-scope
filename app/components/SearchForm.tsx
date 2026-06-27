@@ -14,14 +14,15 @@ type Props = {
   onSearch: (params: SearchParams) => void;
   loading: boolean;
   onClear: () => void;
+  initialValues?: SearchParams;
 };
 
-export default function SearchForm({ onSearch, loading, onClear }: Props) {
-  const [code, setCode] = useState("");
-  const [type, setType] = useState("");
-  const [npi, setNpi] = useState("");
-  const [ein, setEin] = useState("");
-  const [facility, setFacility] = useState("");
+export default function SearchForm({ onSearch, loading, onClear, initialValues }: Props) {
+  const [code, setCode] = useState(initialValues?.code ?? "");
+  const [type, setType] = useState(initialValues?.type ?? "");
+  const [npi, setNpi] = useState(initialValues?.npi ?? "");
+  const [ein, setEin] = useState(initialValues?.ein ?? "");
+  const [facility, setFacility] = useState(initialValues?.facility ?? "");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

@@ -20,7 +20,19 @@ function getMetadata(): StoreMetadata | null {
   }
 }
 
-export default function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{
+    code?: string;
+    type?: string;
+    npi?: string;
+    ein?: string;
+    facility?: string;
+    page?: string;
+  }>;
+}) {
   const metadata = getMetadata();
-  return <RateSearch metadata={metadata} />;
+  return <RateSearch metadata={metadata} searchParams={await searchParams} />;
 }

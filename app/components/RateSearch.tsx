@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import type { QueryResult } from "@/lib/query";
 import SearchForm, { type SearchParams } from "./SearchForm";
 import ResultsTable from "./ResultsTable";
@@ -13,31 +14,65 @@ type StoreMetadata = {
 
 type Props = {
   metadata: StoreMetadata | null;
+  searchParams: {
+    code?: string;
+    type?: string;
+    npi?: string;
+    ein?: string;
+    facility?: string;
+    page?: string;
+  };
 };
 
-export default function RateSearch({ metadata }: Props) {
+export default function RateSearch({ metadata, searchParams }: Props) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [result, setResult] = useState<QueryResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>();
-  const [lastParams, setLastParams] = useState<SearchParams | null>(null);
+  function buildUrl(params: SearchParams, page?: number) {
+    const urlParams = new URLSearchParams({ code: params.code });
+    if (params.type) urlParams.set("type", params.type);
+    if (params.npi) urlParams.set("npi", params.npi);
+    if (params.ein) urlParams.set("ein", params.ein);
+    if (params.facility) urlParams.set("facility", params.facility);
+    if (page && page > 1) urlParams.set("page", String(page));
+    return `${pathname}?${urlParams}`;
+  }
+
+  const initialValues: SearchParams | undefined = searchParams.code
+    ? {
+        code: searchParams.code,
+        type: searchParams.type,
+        npi: searchParams.npi,
+        ein: searchParams.ein,
+        facility: searchParams.facility,
+      }
+    : undefined;
+
+  useEffect(() => {
+    if (!initialValues) return;
+    const page = searchParams.page ? Math.max(1, parseInt(searchParams.page, 10)) : 1;
+    fetchPage(initialValues, page);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleClear() {
     setResult(null);
     setError(null);
-    setLastParams(null);
+    router.replace(pathname);
   }
 
   async function fetchPage(params: SearchParams, page: number) {
     setLoading(true);
     setError(null);
     try {
-      const searchParams = new URLSearchParams({ code: params.code });
-      if (params.type) searchParams.set("type", params.type);
-      if (params.npi) searchParams.set("npi", params.npi);
-      if (params.ein) searchParams.set("ein", params.ein);
-      if (params.facility) searchParams.set("facility", params.facility);
-      if (page > 1) searchParams.set("page", String(page));
-      const res = await fetch(`/api/rates?${searchParams}`);
+      const urlParams = new URLSearchParams({ code: params.code });
+      if (params.type) urlParams.set("type", params.type);
+      if (params.npi) urlParams.set("npi", params.npi);
+      if (params.ein) urlParams.set("ein", params.ein);
+      if (params.facility) urlParams.set("facility", params.facility);
+      if (page > 1) urlParams.set("page", String(page));
+      const res = await fetch(`/api/rates?${urlParams}`);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? `Request failed (${res.status})`);
@@ -51,14 +86,22 @@ export default function RateSearch({ metadata }: Props) {
   }
 
   async function handleSearch(params: SearchParams) {
-    setLastParams(params);
     setResult(null);
+    router.replace(buildUrl(params));
     await fetchPage(params, 1);
   }
 
   function handlePageChange(page: number) {
-    if (!lastParams) return;
-    fetchPage(lastParams, page);
+    if (!searchParams.code) return;
+    const params: SearchParams = {
+      code: searchParams.code,
+      type: searchParams.type,
+      npi: searchParams.npi,
+      ein: searchParams.ein,
+      facility: searchParams.facility,
+    };
+    router.replace(buildUrl(params, page));
+    fetchPage(params, page);
   }
 
   return (
@@ -79,6 +122,7 @@ export default function RateSearch({ metadata }: Props) {
           onClear={handleClear}
           onSearch={handleSearch}
           loading={loading}
+          initialValues={initialValues}
         />
 
         <div className="mt-6">
@@ -88,7 +132,13 @@ export default function RateSearch({ metadata }: Props) {
             </p>
           )}
 
-          {result && <ResultsTable result={result} onPageChange={handlePageChange} loading={loading} />}
+          {result && (
+            <ResultsTable
+              result={result}
+              onPageChange={handlePageChange}
+              loading={loading}
+            />
+          )}
 
           {!result && !loading && !error && (
             <p className="mt-8 text-center text-sm text-zinc-400">
