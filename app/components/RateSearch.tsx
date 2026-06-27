@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { QueryResult } from "@/lib/query";
+import SearchForm, { type SearchParams } from "./SearchForm";
 
 type StoreMetadata = {
   sourceUrl: string;
@@ -18,6 +19,29 @@ export default function RateSearch({ metadata }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>();
 
+  async function handleSearch(params: SearchParams) {
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      const searchParams = new URLSearchParams({ code: params.code });
+      if (params.type) searchParams.set("type", params.type);
+      if (params.npi) searchParams.set("npi", params.npi);
+      if (params.ein) searchParams.set("ein", params.ein);
+      if (params.facility) searchParams.set("facility", params.facility);
+      const res = await fetch(`/api/rates?${searchParams}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Request failed (${res.status})`);
+      }
+      setResult(await res.json());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 font-sans">
       <header className="border-b border-zinc-200 bg-white px-6 py-5">
@@ -32,9 +56,7 @@ export default function RateSearch({ metadata }: Props) {
       </header>
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
-        <div className="rounded-lg border border-zinc-200 bg-white p-6 text-sm text-zinc-400">
-          SearchForm placeholder
-        </div>
+        <SearchForm onSearch={handleSearch} loading={loading} />
 
         <div className="mt-6">
           {error && (
