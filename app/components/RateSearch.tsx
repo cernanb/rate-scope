@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { QueryResult } from "@/lib/query";
 import SearchForm, { type SearchParams } from "./SearchForm";
+import ResultsTable from "./ResultsTable";
 
 type StoreMetadata = {
   sourceUrl: string;
@@ -65,7 +66,8 @@ export default function RateSearch({ metadata }: Props) {
             </p>
           )}
 
-          {/* ResultsTable goes here */}
+          {result && <ResultsTable result={result} />}
+
           {!result && !loading && !error && (
             <p className="mt-8 text-center text-sm text-zinc-400">
               Enter a billing code above to see negotiated rates.
