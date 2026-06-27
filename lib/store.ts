@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Provider, Rate, SerializedStore, Store } from "./types";
 
-const ARTFACT = path.join(__dirname, "../data/rates.json");
+const ARTFACT = path.join(process.cwd(), "data/rates.json");
 
 const globalForStore = globalThis as unknown as { store?: Store };
 
