@@ -10,8 +10,8 @@ type QueryParams = {
 };
 
 export type ResultRow = Rate & {
-  businessNames: string[];
-  eins: string[];
+  businessName: string;
+  ein: string;
 };
 
 export type QueryResult = {
@@ -24,71 +24,55 @@ export type QueryResult = {
 };
 
 export function query(store: Store, params: QueryParams): QueryResult {
-  const { providers, rates } = store;
+  const { providers, rates, multiNameCodes } = store;
 
   let rateList: Rate[][];
+  let isMultiName = false;
 
   const suffix = `:${params.code}`;
 
   if (params.type) {
-    // get the rates for the specific type with the code
     const key = `${params.type}${suffix}`;
-
     const bucket = rates.get(key);
     rateList = bucket ? [bucket] : [];
+    isMultiName = multiNameCodes.has(key);
   } else {
-    // get all rates that end with the code suffix
-    rateList = [...store.rates.entries()]
-      .filter(([key]) => key.endsWith(suffix))
-      .map(([, bucket]) => bucket);
+    const matching = [...store.rates.entries()].filter(([key]) =>
+      key.endsWith(suffix),
+    );
+    rateList = matching.map(([, bucket]) => bucket);
+    isMultiName = matching.some(([key]) => multiNameCodes.has(key));
   }
 
-  const rowCandidates = rateList.flat();
-
-  let filteredRateCandidates = rowCandidates;
-
-  if (params.npi) {
-    filteredRateCandidates = filteredRateCandidates.filter((rate) => {
-      const provider = providers.get(rate.groupId);
-      return provider?.npis.has(params.npi!.trim());
-    });
-  }
-
-  if (params.ein) {
-    filteredRateCandidates = filteredRateCandidates.filter((rate) => {
-      const provider = providers.get(rate.groupId);
-      return provider?.eins.some(
-        (ein) => normalizeEIN(ein) === normalizeEIN(params.ein!.trim()),
-      );
-    });
-  }
-
-  if (params.facility) {
-    filteredRateCandidates = filteredRateCandidates.filter((rate) => {
-      const provider = providers.get(rate.groupId);
-      return provider?.businessNames.some((name) =>
-        name.toLowerCase().includes(params.facility!.trim().toLowerCase()),
-      );
-    });
-  }
+  const npi = params.npi?.trim();
+  const ein = params.ein ? normalizeEIN(params.ein.trim()) : undefined;
+  const facility = params.facility?.trim().toLowerCase();
 
   const rows: ResultRow[] = [];
 
-  for (const rate of filteredRateCandidates) {
+  for (const rate of rateList.flat()) {
     const provider = providers.get(rate.groupId);
+    if (!provider) continue;
 
-    rows.push({
-      ...rate,
-      businessNames: provider?.businessNames ?? [],
-      eins: provider?.eins ?? [],
-    });
+    let subGroups = provider.subGroups;
+
+    if (npi) subGroups = subGroups.filter((sg) => sg.npis.has(npi));
+    if (ein) subGroups = subGroups.filter((sg) => normalizeEIN(sg.ein) === ein);
+    if (facility)
+      subGroups = subGroups.filter((sg) =>
+        sg.businessName.toLowerCase().includes(facility),
+      );
+
+    for (const sg of subGroups) {
+      rows.push({ ...rate, businessName: sg.businessName, ein: sg.ein });
+    }
   }
 
   return {
     code: params.code,
     type: params.type ?? null,
-    name: rows[0]?.name ?? null,
-    description: rows[0]?.description ?? null,
+    name: isMultiName ? null : (rows[0]?.name ?? null),
+    description: isMultiName ? null : (rows[0]?.description ?? null),
     count: rows.length,
     rows,
   };

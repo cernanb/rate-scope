@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { Provider, Rate, SerializedStore, Store } from "./types";
+import { Provider, ProviderSubGroup, Rate, SerializedStore, Store } from "./types";
 
 const ARTFACT = path.join(process.cwd(), "data/rates.json");
 
@@ -16,7 +16,11 @@ export function loadStore(): Store {
   const providers = new Map<string, Provider>(
     Object.entries(data.providers).map(([k, v]) => [
       k,
-      { ...v, npis: new Set(v.npis) },
+      {
+        subGroups: v.subGroups.map(
+          (sg): ProviderSubGroup => ({ ...sg, npis: new Set(sg.npis) }),
+        ),
+      },
     ]),
   );
 
@@ -32,6 +36,7 @@ export function loadStore(): Store {
   return {
     providers,
     rates,
+    multiNameCodes: new Set(data.multiNameCodes),
     sourceUrl: data.sourceUrl,
     ingestDate: data.ingestDate,
     chosenFile: data.chosenFile,
