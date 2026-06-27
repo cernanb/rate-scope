@@ -32,7 +32,7 @@ export function query(store: Store, params: QueryParams): QueryResult {
   const suffix = `:${params.code}`;
 
   if (params.type) {
-    const key = `${params.type}${suffix}`;
+    const key = `${params.type.toUpperCase()}${suffix}`;
     const bucket = rates.get(key);
     rateList = bucket ? [bucket] : [];
     isMultiName = multiNameCodes.has(key);
@@ -70,7 +70,7 @@ export function query(store: Store, params: QueryParams): QueryResult {
 
   return {
     code: params.code,
-    type: params.type ?? null,
+    type: params.type?.toUpperCase() ?? null,
     name: isMultiName ? null : (rows[0]?.name ?? null),
     description: isMultiName ? null : (rows[0]?.description ?? null),
     count: rows.length,
