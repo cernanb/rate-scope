@@ -1,0 +1,86 @@
+"use client";
+
+import { useState } from "react";
+import type { QueryResult } from "@/lib/query";
+
+type StoreMetadata = {
+  sourceUrl: string;
+  ingestDate: string;
+  chosenFile: string;
+};
+
+type Props = {
+  metadata: StoreMetadata | null;
+};
+
+export default function RateSearch({ metadata }: Props) {
+  const [result, setResult] = useState<QueryResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>();
+
+  return (
+    <div className="flex min-h-screen flex-col bg-zinc-50 font-sans">
+      <header className="border-b border-zinc-200 bg-white px-6 py-5">
+        <div className="mx-auto max-w-5xl">
+          <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
+            Rate Scope
+          </h1>
+          <p className="mt-0.5 text-sm text-zinc-500">
+            Search negotiated rates from health insurance transparency files
+          </p>
+        </div>
+      </header>
+
+      <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
+        <div className="rounded-lg border border-zinc-200 bg-white p-6 text-sm text-zinc-400">
+          SearchForm placeholder
+        </div>
+
+        <div className="mt-6">
+          {error && (
+            <p className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </p>
+          )}
+
+          {/* ResultsTable goes here */}
+          {!result && !loading && !error && (
+            <p className="mt-8 text-center text-sm text-zinc-400">
+              Enter a billing code above to see negotiated rates.
+            </p>
+          )}
+
+          {loading && (
+            <p className="mt-8 text-center text-sm text-zinc-400">Loading…</p>
+          )}
+        </div>
+      </main>
+
+      <footer className="border-t border-zinc-200 bg-white px-6 py-4">
+        <div className="mx-auto max-w-5xl">
+          {metadata ? (
+            <p className="text-xs text-zinc-400">
+              Source:{" "}
+              <a
+                href={metadata.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-zinc-600"
+              >
+                {metadata.chosenFile}
+              </a>{" "}
+              · ingested{" "}
+              {new Date(metadata.ingestDate).toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </p>
+          ) : (
+            <p className="text-xs text-zinc-400">No data loaded.</p>
+          )}
+        </div>
+      </footer>
+    </div>
+  );
+}

@@ -9,12 +9,12 @@ type QueryParams = {
   facility?: string;
 };
 
-type ResultRow = Rate & {
+export type ResultRow = Rate & {
   businessNames: string[];
   eins: string[];
 };
 
-type QueryResult = {
+export type QueryResult = {
   code: string;
   type: string | null;
   name: string | null;
