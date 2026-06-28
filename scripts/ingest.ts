@@ -4,7 +4,15 @@ import { mkdir } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
 import { pick } from "stream-json/filters/pick.js";
 import { streamArray } from "stream-json/streamers/stream-array.js";
-import { Provider, ProviderSubGroup, ProviderReference, Rate } from "@/lib/types";
+import {
+  BillingCode,
+  ProviderNpi,
+  ProviderReference,
+  ProviderSubGroup,
+  Rate,
+  RateModifier,
+  RateServiceCode,
+} from "@/lib/types";
 
 const fidelisIndexFile =
   "https://www.centene.com/content/dam/centene/Centene%20Corporate/json/DOCUMENT/2026-04-28_fidelis_index.json";
@@ -30,7 +38,6 @@ async function ingest() {
     );
     console.log(`Found ${inNetworkFiles.length} in-network files.`);
 
-    // Find the specific in-network file we want to ingest based on its name
     const fileToIngest = inNetworkFiles.find((file: { location: string }) =>
       file.location.includes("fidelis-es"),
     );
@@ -41,7 +48,6 @@ async function ingest() {
 
     console.log(`Fetching in-network file from: ${fileToIngest.location}`);
 
-    // stream the JSON data from the in-network file
     const inNetworkResponse = await fetch(fileToIngest.location);
     if (!inNetworkResponse.ok) {
       throw new Error(
@@ -73,14 +79,21 @@ async function ingest() {
       )
       .pipe(streamArray.asStream());
 
-    const providers = new Map<string, Provider>();
-    const rates = new Map<string, Rate[]>();
+    const billingCodes = new Map<string, BillingCode>();
+    const subGroups: ProviderSubGroup[] = [];
+    const providerNpis: ProviderNpi[] = [];
+    const rates: Rate[] = [];
+    const ratesMap = new Map<string, Rate[]>();
+    const rateServiceCodes: RateServiceCode[] = [];
+    const rateModifiers: RateModifier[] = [];
     const seen = new Map<string, Set<string>>();
     const namesByKey = new Map<string, Set<string>>();
+    let rateId = 0;
+    let subGroupId = 0;
 
     for await (const { value } of stream as AsyncIterable<{ value: any }>) {
       if (value.billing_code !== undefined) {
-        // in_network item -> rate rows
+        // in_network item -> billing code + rate rows
         const billingCode = value.billing_code;
         const billingCodeType = value.billing_code_type;
         const name = value.name;
@@ -90,10 +103,19 @@ async function ingest() {
         if (!namesByKey.has(key)) namesByKey.set(key, new Set());
         namesByKey.get(key)!.add(name);
 
-        let bucket = rates.get(key);
+        if (!billingCodes.has(key)) {
+          billingCodes.set(key, {
+            billingCode,
+            billingCodeType,
+            name,
+            description,
+          });
+        }
+
+        let bucket = ratesMap.get(key);
         if (!bucket) {
           bucket = [];
-          rates.set(key, bucket);
+          ratesMap.set(key, bucket);
           seen.set(key, new Set());
         }
         const seenKeys = seen.get(key)!;
@@ -101,55 +123,66 @@ async function ingest() {
         for (const negotiated of value.negotiated_rates ?? []) {
           for (const price of negotiated.negotiated_prices ?? []) {
             for (const groupId of negotiated.provider_references ?? []) {
-              const modifiers = (price.billing_code_modifier ?? []).join(",");
-              const serviceCodes = (price.service_code ?? []).join(",");
-              const rowKey = `${groupId}|${price.negotiated_rate}|${price.negotiated_type}|${price.billing_class}|${price.setting ?? ""}|${modifiers}|${serviceCodes}|${price.expiration_date ?? ""}`;
+              const modifiersStr = (price.billing_code_modifier ?? []).join(
+                ",",
+              );
+              const serviceCodesStr = (price.service_code ?? []).join(",");
+              const rowKey = `${groupId}|${price.negotiated_rate}|${price.negotiated_type}|${price.billing_class}|${price.setting ?? ""}|${modifiersStr}|${serviceCodesStr}|${price.expiration_date ?? ""}`;
               if (seenKeys.has(rowKey)) continue;
               seenKeys.add(rowKey);
 
-              bucket.push({
+              const id = rateId++;
+              const rate: Rate = {
+                id,
+                codeKey: key,
                 groupId: String(groupId),
-                billingCode,
-                billingCodeType,
-                name,
-                description,
                 negotiatedRate: price.negotiated_rate,
                 negotiatedType: price.negotiated_type,
                 billingClass: price.billing_class,
                 setting: price.setting ?? null,
-                serviceCodes: price.service_code ?? [],
-                modifiers: price.billing_code_modifier ?? [],
                 additionalInformation: price.additional_information ?? null,
                 expirationDate: price.expiration_date ?? null,
-              });
+              };
+              bucket.push(rate);
+              rates.push(rate);
+
+              for (const sc of price.service_code ?? []) {
+                rateServiceCodes.push({ rateId: id, serviceCode: sc });
+              }
+              for (const mod of price.billing_code_modifier ?? []) {
+                rateModifiers.push({ rateId: id, modifier: mod });
+              }
             }
           }
         }
       } else {
-        // provider_references item -> provider entry keyed by group id.
+        // provider_references item -> sub-groups and NPIs
         const ref = value as ProviderReference;
         const groupId = String(ref.provider_group_id);
-        const subGroups: ProviderSubGroup[] = [];
 
         for (const group of ref.provider_groups ?? []) {
           if (group.tin?.type !== "ein") continue;
           if (!group.tin.value || !group.tin.business_name) continue;
+
+          const id = String(subGroupId++);
           subGroups.push({
+            id,
+            groupId,
             businessName: group.tin.business_name,
             ein: group.tin.value,
-            npis: new Set((group.npi ?? []).map(String)),
           });
-        }
 
-        providers.set(groupId, { subGroups });
+          for (const npi of (group.npi ?? []).map(String)) {
+            providerNpis.push({ subGroupId: id, npi });
+          }
+        }
       }
     }
 
     console.timeEnd("parse");
-    console.log(`Parsed ${providers.size} provider references.`);
-    const rowCount = [...rates.values()].reduce((n, r) => n + r.length, 0);
+    console.log(`Parsed ${subGroups.length} provider sub-groups.`);
     console.log(
-      `Parsed ${rates.size} unique billing codes (${rowCount} rate rows).`,
+      `Parsed ${billingCodes.size} unique billing codes (${rates.length} rate rows).`,
     );
 
     const multiNameCodes = new Set(
@@ -158,33 +191,17 @@ async function ingest() {
         .map(([key]) => key),
     );
 
-    const store = {
-      providers,
+    const serializedStore = {
+      billingCodes: Object.fromEntries(billingCodes),
+      subGroups: subGroups,
+      providerNpis: providerNpis,
       rates,
-      multiNameCodes,
+      rateServiceCodes,
+      rateModifiers,
+      multiNameCodes: [...multiNameCodes],
       sourceUrl: fileToIngest.location,
       ingestDate: new Date().toISOString(),
       chosenFile: fileToIngest.location.split("/").pop() ?? "unknown",
-    };
-
-    // Write the store to disk as JSON
-    const serializedStore = {
-      providers: Object.fromEntries(
-        [...store.providers.entries()].map(([k, v]) => [
-          k,
-          {
-            subGroups: v.subGroups.map((sg) => ({
-              ...sg,
-              npis: [...sg.npis],
-            })),
-          },
-        ]),
-      ),
-      rates: Object.fromEntries(store.rates),
-      multiNameCodes: [...store.multiNameCodes],
-      sourceUrl: store.sourceUrl,
-      ingestDate: store.ingestDate,
-      chosenFile: store.chosenFile,
     };
 
     console.time("write");
@@ -194,7 +211,6 @@ async function ingest() {
     );
     console.timeEnd("write");
 
-    // Drop the temp in-network copy now that the artifact is written.
     await fs.promises.rm(TMP_FILE, { force: true });
 
     console.log("Ingestion complete. Data written to data/rates.json");
