@@ -74,6 +74,8 @@ type StreamedItem = InNetworkItem | ProviderReference;
 
 async function ingest() {
   console.time("ingest duration");
+  let spinner: ReturnType<typeof createSpinner> | null = null;
+
   try {
     await mkdir("data", { recursive: true });
 
@@ -101,7 +103,7 @@ async function ingest() {
 
     console.log(`Fetching in-network file from: ${fileToIngest.location}`);
 
-    const spinner = createSpinner();
+    spinner = createSpinner();
     spinner.update("Downloading...");
 
     const inNetworkResponse = await fetch(fileToIngest.location);
@@ -239,6 +241,7 @@ async function ingest() {
     spinner.stop(
       `✓ Parsed ${billingCodes.size.toLocaleString()} billing codes, ${rates.length.toLocaleString()} rates, ${subGroups.length.toLocaleString()} sub-groups`,
     );
+    spinner = null;
     console.timeEnd("parse");
 
     const multiNameCodes = new Set(
@@ -276,6 +279,7 @@ async function ingest() {
     console.error("Error during ingestion:", error);
     process.exitCode = 1;
   } finally {
+    spinner?.stop("Ingestion stopped.");
     console.timeEnd("ingest duration");
   }
 }
