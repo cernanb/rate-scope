@@ -23,7 +23,7 @@ The app reads from a pre-built artifact at `data/store.json`. You need to genera
 npm run ingest
 ```
 
-This fetches the Fidelis in-network MRF, writes it temporarily to `data/tmp_innetwork.json`, stream-parses that local file with `stream-json`, and writes the normalized artifact to `data/store.json`. Depending on your connection, expect it to take some time — the source file is large.
+This fetches the Fidelis in-network MRF, writes it temporarily to `data/tmp_innetwork.json`, stream-parses that local file with `stream-json`, and writes the normalized artifact to `data/store.json`. Depending on your connection, expect it to take some time - the source file is large.
 
 ### Run the dev server
 
@@ -46,9 +46,9 @@ Open [http://localhost:3000](http://localhost:3000).
 
 The app is split into three layers:
 
-- **Ingest** (`scripts/ingest.ts`) — streams the source MRF, parses it, and writes `data/store.json` in a normalized format
-- **Store** (`lib/store.ts`) — loads `data/store.json` on first request and builds in-memory indexes
-- **Query** (`lib/query.ts`) — filters and joins across the indexes to produce results
+- **Ingest** (`scripts/ingest.ts`) - streams the source MRF, parses it, and writes `data/store.json` in a normalized format
+- **Store** (`lib/store.ts`) - loads `data/store.json` on first request and builds in-memory indexes
+- **Query** (`lib/query.ts`) - filters and joins across the indexes to produce results
 
 The data model mirrors a relational schema (billing codes, provider sub-groups, NPIs, rates, and junction tables for modifiers and service codes) stored as JSON.
 
@@ -105,6 +105,8 @@ An alternative would be to require the source file to be downloaded separately a
 - **Ingest multiple in-network files.** The index references more than one in-network file. The current ingest targets a single file by name match. A more complete implementation would process all referenced files and merge the results, with plan-level metadata attached to each rate row for filtering.
 
 - **Stale data detection.** There is no mechanism to detect when the source file has been updated. A scheduled job that re-runs ingest when the upstream URL changes — or at least surfaces the `ingestDate` as a warning when it is older than a threshold — would make the tool more reliable in practice.
+
+- **Secondary code lookup index.** When the user searches without selecting a billing code type, the query layer currently scans the in-memory `ratesByCode` keys for matching `type:code` entries. That is fine for this dataset, but a derived `billingCode -> codeKeys[]` index built during `loadStore()` would make the lookup path clearer and avoid scanning every code key on untyped searches.
 
 - **Tests.** The query logic in `lib/query.ts` is pure and deterministic, which makes it well-suited for unit tests. A small fixture of known billing codes and providers would let the filtering and pagination logic be verified without running a full ingest.
 
