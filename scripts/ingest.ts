@@ -192,6 +192,8 @@ async function ingest() {
         .map(([key]) => key),
     );
 
+    const codeTypes = [...new Set([...billingCodes.values()].map((bc) => bc.billingCodeType))].sort();
+
     const serializedStore = {
       billingCodes: Object.fromEntries(billingCodes),
       subGroups: subGroups,
@@ -200,6 +202,7 @@ async function ingest() {
       rateServiceCodes,
       rateModifiers,
       multiNameCodes: [...multiNameCodes],
+      codeTypes,
       sourceUrl: fileToIngest.location,
       ingestDate: new Date().toISOString(),
       chosenFile: fileToIngest.location.split("/").pop() ?? "unknown",

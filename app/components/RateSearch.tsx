@@ -10,6 +10,7 @@ type StoreMetadata = {
   sourceUrl: string;
   ingestDate: string;
   chosenFile: string;
+  codeTypes: string[];
 };
 
 type Props = {
@@ -123,6 +124,7 @@ export default function RateSearch({ metadata, searchParams }: Props) {
           onSearch={handleSearch}
           loading={loading}
           initialValues={initialValues}
+          codeTypes={metadata?.codeTypes ?? []}
         />
 
         <div className="mt-6">

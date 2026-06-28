@@ -114,6 +114,10 @@ An alternative would be to require the source file to be downloaded separately a
 
 ## Assumptions
 
+### Billing code type dropdown
+
+The CMS MRF schema defines 17 possible billing code types (CPT, HCPCS, NDC, ICD, MS-DRG, and others). Rather than hardcoding all 17 as dropdown options, the type dropdown is populated dynamically from the types that are actually present in the ingested file. For this Fidelis in-network file, only three types appear — CPT, HCPCS, and RC — so those are the only options shown. This avoids implying that a user can filter by MS-DRG or CDT when no rates of those types exist in the data.
+
 ### Provider TIN type
 
 The CMS MRF schema allows `tin.type` to be either `"ein"` or `"npi"`. In this Fidelis file, all observed TINs are EIN-typed and carry a `business_name`. The ingest script guards against this explicitly — skipping any TIN where `type !== "ein"` or where `value` or `business_name` is missing — so the store only contains named EIN sub-groups. If a future file includes NPI-typed TINs or unnamed entries, they will be silently skipped rather than causing a parse error, but they also will not appear in search results.

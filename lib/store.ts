@@ -88,6 +88,7 @@ export function loadStore(): Store {
     serviceCodesByRate,
     modifiersByRate,
     multiNameCodes: new Set(data.multiNameCodes),
+    codeTypes: data.codeTypes ?? [],
     sourceUrl: data.sourceUrl,
     ingestDate: data.ingestDate,
     chosenFile: data.chosenFile,

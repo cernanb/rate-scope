@@ -47,6 +47,7 @@ export type SerializedStore = {
   rateServiceCodes: RateServiceCode[];
   rateModifiers: RateModifier[];
   multiNameCodes: string[];
+  codeTypes: string[];
   sourceUrl: string;
   ingestDate: string;
   chosenFile: string;
@@ -62,6 +63,7 @@ export type Store = {
   serviceCodesByRate: Map<number, string[]>;
   modifiersByRate: Map<number, string[]>;
   multiNameCodes: Set<string>;
+  codeTypes: string[];
   sourceUrl: string;
   ingestDate: string;
   chosenFile: string;

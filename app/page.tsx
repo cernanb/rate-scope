@@ -5,6 +5,7 @@ type StoreMetadata = {
   sourceUrl: string;
   ingestDate: string;
   chosenFile: string;
+  codeTypes: string[];
 };
 
 function getMetadata(): StoreMetadata | null {
@@ -14,6 +15,7 @@ function getMetadata(): StoreMetadata | null {
       sourceUrl: store.sourceUrl,
       ingestDate: store.ingestDate,
       chosenFile: store.chosenFile,
+      codeTypes: store.codeTypes,
     };
   } catch {
     return null;

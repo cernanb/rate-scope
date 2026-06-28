@@ -15,9 +15,10 @@ type Props = {
   loading: boolean;
   onClear: () => void;
   initialValues?: SearchParams;
+  codeTypes: string[];
 };
 
-export default function SearchForm({ onSearch, loading, onClear, initialValues }: Props) {
+export default function SearchForm({ onSearch, loading, onClear, initialValues, codeTypes }: Props) {
   const [code, setCode] = useState(initialValues?.code ?? "");
   const [type, setType] = useState(initialValues?.type ?? "");
   const [npi, setNpi] = useState(initialValues?.npi ?? "");
@@ -60,21 +61,24 @@ export default function SearchForm({ onSearch, loading, onClear, initialValues }
           />
         </div>
 
-        <div className="w-28">
+        <div className="w-36">
           <label
             htmlFor="type"
             className="mb-1.5 block text-xs font-medium text-zinc-700"
           >
             Type
           </label>
-          <input
+          <select
             id="type"
-            type="text"
             value={type}
             onChange={(e) => setType(e.target.value)}
-            placeholder="e.g. CPT"
-            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-          />
+            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          >
+            <option value="">All</option>
+            {codeTypes.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
         </div>
       </div>
 
