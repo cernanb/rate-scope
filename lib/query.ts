@@ -11,7 +11,17 @@ type QueryParams = {
   page?: number;
 };
 
-export type ResultRow = Rate & {
+export type ResultRow = {
+  id: number;
+  groupId: string;
+  negotiatedRate: number;
+  negotiatedType: string;
+  billingClass: string;
+  setting: string | null;
+  serviceCodes: string[];
+  modifiers: string[];
+  additionalInformation: string | null;
+  expirationDate: string | null;
   businessName: string;
   ein: string;
 };
@@ -28,9 +38,19 @@ export type QueryResult = {
 };
 
 export function query(store: Store, params: QueryParams): QueryResult {
-  const { providers, rates, multiNameCodes } = store;
+  const {
+    billingCodes,
+    ratesByCode,
+    subGroups,
+    subGroupsByGroup,
+    subGroupsByNpi,
+    subGroupsByEin,
+    serviceCodesByRate,
+    modifiersByRate,
+    multiNameCodes,
+  } = store;
 
-  let rateList: Rate[][];
+  let rateLists: Rate[][];
   let isMultiName = false;
   const page = params.page ?? 1;
 
@@ -38,14 +58,14 @@ export function query(store: Store, params: QueryParams): QueryResult {
 
   if (params.type) {
     const key = `${params.type.toUpperCase()}${suffix}`;
-    const bucket = rates.get(key);
-    rateList = bucket ? [bucket] : [];
+    const bucket = ratesByCode.get(key);
+    rateLists = bucket ? [bucket] : [];
     isMultiName = multiNameCodes.has(key);
   } else {
-    const matching = [...store.rates.entries()].filter(([key]) =>
+    const matching = [...ratesByCode.entries()].filter(([key]) =>
       key.endsWith(suffix),
     );
-    rateList = matching.map(([, bucket]) => bucket);
+    rateLists = matching.map(([, bucket]) => bucket);
     isMultiName = matching.some(([key]) => multiNameCodes.has(key));
   }
 
@@ -53,33 +73,60 @@ export function query(store: Store, params: QueryParams): QueryResult {
   const ein = params.ein ? normalizeEIN(params.ein.trim()) : undefined;
   const facility = params.facility?.trim().toLowerCase();
 
+  const npiSubGroupIds = npi ? new Set(subGroupsByNpi.get(npi) ?? []) : null;
+  const einSubGroupIds = ein ? new Set(subGroupsByEin.get(ein) ?? []) : null;
+
   const rows: ResultRow[] = [];
 
-  for (const rate of rateList.flat()) {
-    const provider = providers.get(rate.groupId);
-    if (!provider) continue;
+  for (const rate of rateLists.flat()) {
+    const sgIds = subGroupsByGroup.get(rate.groupId);
+    if (!sgIds) continue;
 
-    let subGroups = provider.subGroups;
+    for (const sgId of sgIds) {
+      if (npiSubGroupIds && !npiSubGroupIds.has(sgId)) continue;
+      if (einSubGroupIds && !einSubGroupIds.has(sgId)) continue;
 
-    if (npi) subGroups = subGroups.filter((sg) => sg.npis.has(npi));
-    if (ein) subGroups = subGroups.filter((sg) => normalizeEIN(sg.ein) === ein);
-    if (facility)
-      subGroups = subGroups.filter((sg) =>
-        sg.businessName.toLowerCase().includes(facility),
-      );
+      const sg = subGroups.get(sgId)!;
+      if (facility && !sg.businessName.toLowerCase().includes(facility))
+        continue;
 
-    for (const sg of subGroups) {
-      rows.push({ ...rate, businessName: sg.businessName, ein: sg.ein });
+      rows.push({
+        id: rate.id,
+        groupId: rate.groupId,
+        negotiatedRate: rate.negotiatedRate,
+        negotiatedType: rate.negotiatedType,
+        billingClass: rate.billingClass,
+        setting: rate.setting,
+        additionalInformation: rate.additionalInformation,
+        expirationDate: rate.expirationDate,
+        serviceCodes: serviceCodesByRate.get(rate.id) ?? [],
+        modifiers: modifiersByRate.get(rate.id) ?? [],
+        businessName: sg.businessName,
+        ein: sg.ein,
+      });
     }
   }
 
   const paginatedRows = rows.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
+  let name: string | null = null;
+  let description: string | null = null;
+  if (!isMultiName) {
+    const firstKey = params.type
+      ? `${params.type.toUpperCase()}${suffix}`
+      : [...ratesByCode.keys()].find((k) => k.endsWith(suffix));
+    if (firstKey) {
+      const bc = billingCodes.get(firstKey);
+      name = bc?.name ?? null;
+      description = bc?.description ?? null;
+    }
+  }
+
   return {
     code: params.code,
     type: params.type?.toUpperCase() ?? null,
-    name: isMultiName ? null : (rows[0]?.name ?? null),
-    description: isMultiName ? null : (rows[0]?.description ?? null),
+    name,
+    description,
     count: rows.length,
     page,
     totalPages: Math.max(1, Math.ceil(rows.length / PER_PAGE)),
