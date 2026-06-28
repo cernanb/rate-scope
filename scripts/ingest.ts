@@ -46,6 +46,32 @@ const fidelisIndexFile =
 
 const TMP_FILE = "data/tmp_innetwork.json";
 
+type NegotiatedPrice = {
+  negotiated_rate: number;
+  negotiated_type: string;
+  billing_class: string;
+  setting?: string;
+  additional_information?: string;
+  expiration_date?: string;
+  service_code?: string[];
+  billing_code_modifier?: string[];
+};
+
+type NegotiatedRate = {
+  provider_references?: number[];
+  negotiated_prices?: NegotiatedPrice[];
+};
+
+type InNetworkItem = {
+  billing_code: string;
+  billing_code_type: string;
+  name: string;
+  description: string;
+  negotiated_rates?: NegotiatedRate[];
+};
+
+type StreamedItem = InNetworkItem | ProviderReference;
+
 async function ingest() {
   console.time("ingest duration");
   try {
@@ -117,9 +143,13 @@ async function ingest() {
     let rateId = 0;
     let subGroupId = 0;
 
+    for await (const { value } of stream as AsyncIterable<{
+      value: StreamedItem;
+    }>) {
       spinner.update(
         `Parsing... ${rateId.toLocaleString()} rates, ${subGroupId.toLocaleString()} sub-groups`,
       );
+      if ("billing_code" in value) {
         // in_network item -> billing code + rate rows
         const billingCode = value.billing_code;
         const billingCodeType = value.billing_code_type;
@@ -184,7 +214,7 @@ async function ingest() {
         }
       } else {
         // provider_references item -> sub-groups and NPIs
-        const ref = value as ProviderReference;
+        const ref = value;
         const groupId = String(ref.provider_group_id);
 
         for (const group of ref.provider_groups ?? []) {
