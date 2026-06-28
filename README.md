@@ -98,6 +98,20 @@ An alternative would be to require the source file to be downloaded separately a
 
 ---
 
+## What I Would Improve With More Time
+
+- **Database-backed storage.** The JSON artifact works for this dataset, but migrating to Postgres would unlock incremental updates, multi-instance deployments, and the ability to query without loading everything into memory. The data model is already normalized and would map directly to tables with minimal changes to the query layer.
+
+- **Search by procedure name.** The current UI requires users to know the billing code they are looking for. A name-based or fuzzy search would make the tool accessible to users who know what procedure they need but not its code. This would also resolve the multi-name ambiguity more gracefully — surfacing all matching codes rather than requiring an exact code entry.
+
+- **Ingest multiple in-network files.** The index references more than one in-network file. The current ingest targets a single file by name match. A more complete implementation would process all referenced files and merge the results, with plan-level metadata attached to each rate row for filtering.
+
+- **Stale data detection.** There is no mechanism to detect when the source file has been updated. A scheduled job that re-runs ingest when the upstream URL changes — or at least surfaces the `ingestDate` as a warning when it is older than a threshold — would make the tool more reliable in practice.
+
+- **Tests.** The query logic in `lib/query.ts` is pure and deterministic, which makes it well-suited for unit tests. A small fixture of known billing codes and providers would let the filtering and pagination logic be verified without running a full ingest.
+
+---
+
 ## Assumptions
 
 ### Provider TIN type
