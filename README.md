@@ -23,7 +23,7 @@ The app reads from a pre-built artifact at `data/store.json`. You need to genera
 npm run ingest
 ```
 
-This fetches the Fidelis in-network MRF, parses it as a stream, and writes the normalized artifact to `data/store.json`. Depending on your connection, expect it to take some time — the source file is large.
+This fetches the Fidelis in-network MRF, writes it temporarily to `data/tmp_innetwork.json`, stream-parses that local file with `stream-json`, and writes the normalized artifact to `data/store.json`. Depending on your connection, expect it to take some time — the source file is large.
 
 ### Run the dev server
 
@@ -86,13 +86,13 @@ This was an acceptable tradeoff for this implementation because the primary mode
 
 The cleaner long-term fix would be to store all observed names per billing code and surface them as alternatives, or to flag the ambiguity inline in the result so users know to verify the procedure description against an external code lookup.
 
-### Streaming ingest vs. full parse
+### Temporary download plus streaming parse
 
 The Fidelis in-network file is large enough that loading it into memory with `JSON.parse` is not viable — doing so would exhaust the Node.js heap before the parse completes. The ingest script handles this by streaming the file with `stream-json`, which parses the JSON incrementally and emits only the top-level array items (`in_network` and `provider_references`) one at a time. Peak memory during ingest stays flat regardless of file size.
 
 The tradeoff is that streaming makes the code more complex than a simple `fetch` + `JSON.parse`. The `stream-json` pipeline requires understanding how the library surfaces nested objects, and the `pick` filter has to be carefully scoped to avoid pulling in more data than intended. It also means the two top-level arrays (`in_network` and `provider_references`) are interleaved in a single pass, so provider group data has to be accumulated before it can be joined against rates — which is why the store artifact exists at all rather than querying the source file directly.
 
-An alternative would be to require the source file to be downloaded separately and only process it locally, which would allow memory-mapped reads or a SQLite import. For the take-home scope, streaming directly from the remote URL keeps setup to a single `npm run ingest` command.
+An alternative would be to require the source file to be downloaded separately and only process it locally, which would allow memory-mapped reads or a SQLite import. For the take-home scope, downloading to a temporary file before stream-parsing keeps setup to a single `npm run ingest` command while avoiding a full in-memory `JSON.parse`.
 
 ---
 
