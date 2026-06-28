@@ -35,12 +35,10 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### Scripts
 
-| Command          | Description                                                              |
-| ---------------- | ------------------------------------------------------------------------ |
-| `npm run ingest` | Fetch and parse the MRF, write `data/store.json`                         |
-| `npm run dev`    | Start the Next.js dev server                                             |
-| `npm run query`  | Run a one-off query against the local artifact (edit `scripts/query.ts`) |
-| `npm run build`  | Production build                                                         |
+| Command          | Description                                      |
+| ---------------- | ------------------------------------------------ |
+| `npm run ingest` | Fetch and parse the MRF, write `data/store.json` |
+| `npm run dev`    | Start the Next.js dev server                     |
 
 ---
 
