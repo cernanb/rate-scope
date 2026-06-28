@@ -15,6 +15,32 @@ import {
 } from "@/lib/types";
 import { STORE_FILE } from "@/lib/store";
 
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+function createSpinner() {
+  let frame = 0;
+  let message = "";
+  const start = Date.now();
+  const interval = setInterval(() => {
+    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+    process.stdout.write(
+      `\r${SPINNER_FRAMES[frame % SPINNER_FRAMES.length]} ${message} (${elapsed}s)`.padEnd(
+        72,
+      ),
+    );
+    frame++;
+  }, 80);
+  return {
+    update(msg: string) {
+      message = msg;
+    },
+    stop(finalMsg: string) {
+      clearInterval(interval);
+      process.stdout.write(`\r${finalMsg}\n`);
+    },
+  };
+}
+
 const fidelisIndexFile =
   "https://www.centene.com/content/dam/centene/Centene%20Corporate/json/DOCUMENT/2026-04-28_fidelis_index.json";
 
@@ -49,6 +75,9 @@ async function ingest() {
 
     console.log(`Fetching in-network file from: ${fileToIngest.location}`);
 
+    const spinner = createSpinner();
+    spinner.update("Downloading...");
+
     const inNetworkResponse = await fetch(fileToIngest.location);
     if (!inNetworkResponse.ok) {
       throw new Error(
@@ -64,12 +93,8 @@ async function ingest() {
       inNetworkResponse.body as import("node:stream/web").ReadableStream,
     );
 
-    console.time("download");
     await pipeline(jsonStream, fs.createWriteStream(TMP_FILE));
-    console.timeEnd("download");
-
-    console.log("Finished streaming in-network file. Parsing (this may take a minute)...");
-
+    spinner.update("Parsing...");
     console.time("parse");
     const stream = fs
       .createReadStream(TMP_FILE)
@@ -92,8 +117,9 @@ async function ingest() {
     let rateId = 0;
     let subGroupId = 0;
 
-    for await (const { value } of stream as AsyncIterable<{ value: any }>) {
-      if (value.billing_code !== undefined) {
+      spinner.update(
+        `Parsing... ${rateId.toLocaleString()} rates, ${subGroupId.toLocaleString()} sub-groups`,
+      );
         // in_network item -> billing code + rate rows
         const billingCode = value.billing_code;
         const billingCodeType = value.billing_code_type;
@@ -180,11 +206,10 @@ async function ingest() {
       }
     }
 
-    console.timeEnd("parse");
-    console.log(`Parsed ${subGroups.length} provider sub-groups.`);
-    console.log(
-      `Parsed ${billingCodes.size} unique billing codes (${rates.length} rate rows).`,
+    spinner.stop(
+      `✓ Parsed ${billingCodes.size.toLocaleString()} billing codes, ${rates.length.toLocaleString()} rates, ${subGroups.length.toLocaleString()} sub-groups`,
     );
+    console.timeEnd("parse");
 
     const multiNameCodes = new Set(
       [...namesByKey.entries()]
@@ -192,7 +217,9 @@ async function ingest() {
         .map(([key]) => key),
     );
 
-    const codeTypes = [...new Set([...billingCodes.values()].map((bc) => bc.billingCodeType))].sort();
+    const codeTypes = [
+      ...new Set([...billingCodes.values()].map((bc) => bc.billingCodeType)),
+    ].sort();
 
     const serializedStore = {
       billingCodes: Object.fromEntries(billingCodes),
@@ -209,10 +236,7 @@ async function ingest() {
     };
 
     console.time("write");
-    await fs.promises.writeFile(
-      STORE_FILE,
-      JSON.stringify(serializedStore),
-    );
+    await fs.promises.writeFile(STORE_FILE, JSON.stringify(serializedStore));
     console.timeEnd("write");
 
     await fs.promises.rm(TMP_FILE, { force: true });
