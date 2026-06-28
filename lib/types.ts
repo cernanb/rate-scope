@@ -1,40 +1,51 @@
-export type Rate = {
-  groupId: string; // foreign key into the providers map
+export type BillingCode = {
   billingCode: string;
   billingCodeType: string;
   name: string;
   description: string;
+};
+
+export type ProviderSubGroup = {
+  id: string;
+  groupId: string;
+  businessName: string;
+  ein: string;
+};
+
+export type ProviderNpi = {
+  subGroupId: string;
+  npi: string;
+};
+
+export type Rate = {
+  id: number;
+  codeKey: string;
+  groupId: string;
   negotiatedRate: number;
   negotiatedType: string;
   billingClass: string;
   setting: string | null;
-  serviceCodes: string[];
-  modifiers: string[];
   additionalInformation: string | null;
   expirationDate: string | null;
 };
 
-export type ProviderSubGroup = {
-  businessName: string;
-  ein: string;
-  npis: Set<string>;
+export type RateServiceCode = {
+  rateId: number;
+  serviceCode: string;
 };
 
-export type Provider = {
-  subGroups: ProviderSubGroup[];
-};
-
-export type SerializedProviderSubGroup = Omit<ProviderSubGroup, "npis"> & {
-  npis: string[];
-};
-
-export type SerializedProvider = {
-  subGroups: SerializedProviderSubGroup[];
+export type RateModifier = {
+  rateId: number;
+  modifier: string;
 };
 
 export type SerializedStore = {
-  providers: Record<string, SerializedProvider>;
-  rates: Record<string, Rate[]>; // key = "<billingCodeType>:<billingCode>"
+  billingCodes: Record<string, BillingCode>;
+  subGroups: ProviderSubGroup[];
+  providerNpis: ProviderNpi[];
+  rates: Rate[];
+  rateServiceCodes: RateServiceCode[];
+  rateModifiers: RateModifier[];
   multiNameCodes: string[];
   sourceUrl: string;
   ingestDate: string;
@@ -42,8 +53,14 @@ export type SerializedStore = {
 };
 
 export type Store = {
-  providers: Map<string, Provider>;
-  rates: Map<string, Rate[]>; // key = "<billingCodeType>:<billingCode>"
+  billingCodes: Map<string, BillingCode>;
+  subGroups: Map<string, ProviderSubGroup>;
+  subGroupsByGroup: Map<string, string[]>;
+  subGroupsByNpi: Map<string, string[]>;
+  subGroupsByEin: Map<string, string[]>;
+  ratesByCode: Map<string, Rate[]>;
+  serviceCodesByRate: Map<number, string[]>;
+  modifiersByRate: Map<number, string[]>;
   multiNameCodes: Set<string>;
   sourceUrl: string;
   ingestDate: string;
