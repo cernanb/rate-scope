@@ -13,6 +13,7 @@ import {
   RateModifier,
   RateServiceCode,
 } from "@/lib/types";
+import { STORE_FILE } from "@/lib/store";
 
 const fidelisIndexFile =
   "https://www.centene.com/content/dam/centene/Centene%20Corporate/json/DOCUMENT/2026-04-28_fidelis_index.json";
@@ -67,7 +68,7 @@ async function ingest() {
     await pipeline(jsonStream, fs.createWriteStream(TMP_FILE));
     console.timeEnd("download");
 
-    console.log("Finished streaming in-network file.");
+    console.log("Finished streaming in-network file. Parsing (this may take a minute)...");
 
     console.time("parse");
     const stream = fs
@@ -206,14 +207,14 @@ async function ingest() {
 
     console.time("write");
     await fs.promises.writeFile(
-      "data/rates.json",
+      STORE_FILE,
       JSON.stringify(serializedStore),
     );
     console.timeEnd("write");
 
     await fs.promises.rm(TMP_FILE, { force: true });
 
-    console.log("Ingestion complete. Data written to data/rates.json");
+    console.log(`Ingestion complete. Data written to ${STORE_FILE}`);
   } catch (error) {
     console.error("Error during ingestion:", error);
     process.exitCode = 1;

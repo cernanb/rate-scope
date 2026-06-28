@@ -9,7 +9,8 @@ import {
 } from "./types";
 import { normalizeEIN } from "./util";
 
-const ARTIFACT = path.join(process.cwd(), "data/rates.json");
+export const STORE_FILE = "data/store.json";
+const ARTIFACT = path.join(process.cwd(), STORE_FILE);
 
 const globalForStore = globalThis as unknown as { store?: Store };
 
